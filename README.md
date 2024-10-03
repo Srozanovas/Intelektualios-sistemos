@@ -1,1 +1,0 @@
-# Intelektualios-sistemos

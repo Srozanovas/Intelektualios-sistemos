@@ -1,0 +1,235 @@
+clc; 
+clear all; 
+
+
+
+%% INICIALIZUOJAMI KOEFICIENTAI
+paveiksleliu_kiekis = 30;
+w1=0.5;
+w2=0.5;
+b=0.5; 
+t0 = 1; %temporary skirtas teoriniu atsakymu inicializavimui (indexas)
+eta = 0.1; % mokymo zingsnelis
+
+
+
+y_teorine = zeros(1,paveiksleliu_kiekis);
+x1_spalva = zeros(1,paveiksleliu_kiekis); 
+x2_apvalumas = zeros(1,paveiksleliu_kiekis);
+y_praktine = zeros (1, paveiksleliu_kiekis);
+
+%% NUSKAITOMI PAVEIKSLELIAI IR SUSKAICIUOJAMOS SPALVOS IR APVALUMO REIKSMES 
+
+for i=0:1:100 %%NUSKAITOMI OBUOLIU PAVEIKSLELIAI 
+    if i<10
+        str = "Pictures/Learn/apple_0"+num2str(i)+".jpg";
+    else 
+        str = "Pictures/Learn/apple_"+num2str(i)+".jpg";
+    end 
+    if exist(str, 'file') == 2  %%jei egzistuoja failas tokiu pavadinimu tada nuskaitom
+        pav = imread(str);
+        y_teorine(t0) = 1;
+        x1_spalva(t0) = spalva_color(pav);
+        x2_apvalumas(t0) = apvalumas_roundness(pav);
+        t0 = t0+1;
+    end
+end
+t00 = t0; %%temp naudojamas grafikui 
+
+
+
+
+for i=0:1:100 %%NUSKAITOMI KRIAUSIU PAVEIKSLELIAI 
+    if i<10
+        str = "Pictures/Learn/pear_0"+num2str(i)+".jpg";
+    else 
+        str = "Pictures/Learn/pear_"+num2str(i)+".jpg";
+    end 
+    if exist(str, 'file') == 2 %%jei egzistuoja failas tokiu pavadinimu tada nuskaitom
+        pav = imread(str);
+        y_teorine(t0) = -1;
+        x1_spalva(t0) = spalva_color(pav);
+        x2_apvalumas(t0) = apvalumas_roundness(pav);
+        t0 = t0+1;
+    end
+end
+
+pav_kiekis = t0-1;
+
+
+%%Grafikas obuoliu ir kriausiu paveiksleliu pasiskirstymo pagal pozymius
+
+figure(1);
+x1_spalva_apples = x1_spalva(1:t00-1);
+x2_apvalumas_apples = x2_apvalumas(1:t00-1);
+x1_spalva_pear = x1_spalva(1,t00:pav_kiekis);
+x2_apvalumas_pear = x2_apvalumas(1,t00:pav_kiekis);
+scatter(x1_spalva_apples, x2_apvalumas_apples, 'X', "B");
+xlim([0 1]); 
+ylim([0 1]);
+hold on 
+scatter(x1_spalva_pear, x2_apvalumas_pear, 'O', "R");
+legend("Apples", "Pears");
+xlabel("x1 (spalva)");
+ylabel("x2 (apvalumas)")
+
+
+clear x1_spalva_pear, x2_apvalumas_pear, x1_spalva_apples, x2_apvalumas_apples, t00;
+
+
+%%suskaiciuojami y praktines vertes su turimais W1 ir w2 
+
+
+
+%% Mokymas
+
+x1_grafikui = 0:0.1:1;
+
+
+e_bendra=1; % klaida 
+e_cnt = 0; % skaitiklis sekti kiek is eiles kartu klaida buvo 0 
+cnt = 0; % skaitiklis matuoti kiek ciklu reikejo pasiekti rezultatui. Galima naudoti ir mokymo sustabdymui jei per ilgai negaunamas rezultatas
+e_min = t0; % maximalus pasiektas geru rezultatu skaicius
+while (e_bendra ~= 0) % kol bendra klaida nera lygi 0 vykdomas ciklas
+    % einama per visus paveikslelius ir skaiciuojama kiekvieno klaida
+    % jei klaida 0 padidinamas e_cnt skaitiklis. jei klaida ne 0 skaitiklis
+    % pamazinamas. Po visu paveiksleliu patikrinama ar e_cnt yra lygus visu
+    % paveiksleliu skaiciui. Jei ne bus vel einama per visus paveikslelius.
+    % Po kiekvieno for ciklo padidinamas cnt skaitiklis patikrinimui kiek
+    % ciklu uztruko 
+
+    %%Grafikas iliustruojantis kiekvienos kreives artejima
+    x2_grafikui = (-w1/w2)*x1_grafikui; 
+    x2_grafikui = x2_grafikui - b/w2;
+    % plot(x1_grafikui, x2_grafikui)
+    cnt = cnt + 1; 
+    e_cnt = pav_kiekis;
+    %suskaiciavimas su esamais koeficientais
+    e = 0; 
+
+    % klaidu skaiciavimas ir koeficientu derinimas
+    for i = 1:1:pav_kiekis
+        
+        v = w1*x1_spalva(i) + w2*x2_apvalumas(i) + b;
+        if v>0
+            y_praktine(i) = -1; 
+        else 
+            y_praktine(i) = 1;
+        end 
+        e =  y_praktine(i) - y_teorine(i);    % momentine paklaida 
+        if (e~=0) % paklaida nera lygi 0 reikia perskaiciuoti koeficientus ir is naujo bandyti 
+            w1 = w1 + eta*x1_spalva(i)*e; 
+            w2 = w2 + eta*x2_apvalumas(i)*e; 
+            b = b + eta * e;
+            break;
+        else 
+            e_cnt = e_cnt-1;  %klaidu kiekis  
+            if (e_cnt < e_min)
+                e_min = e_cnt; %%paskaiciuojama maximalus teisingai identifikuotu 
+            end
+        end
+    end
+
+    if (e_cnt == 0)  % geru rezultatu skaicius lygus paveiksleliu skaiciui - visi spejimai geri 
+        e_bendra = 0; 
+        plot(x1_grafikui, x2_grafikui)
+        legend("Apples", "Pears", "Koef kreive");
+        title("Rasta kreive")
+    end
+end  
+clear x1_spalva x1_spalva_apples x1_spalva_pear x2_apvalumas_pear x2_apvalumas_apples x2_apvalumas y_teorine
+clear t00 t0 pav pav_kiekis paveiksleliu_kiekis
+    
+    
+    
+    
+    
+%%TESTAVIMAS 
+%testavimui buvo panaudoti atsisiusti paveiksleliai (9 paveiksleliai)
+%nubreztas pasiskirstymas ir kaip kreive atskiria dvi grupes 
+
+t0 = 1; %temporary skirtas teoriniu atsakymu inicializavimui (indexas)
+
+
+for i=0:1:100 %%NUSKAITOMI OBUOLIU PAVEIKSLELIAI 
+    if i<10
+        str = "Pictures/Test/apple_0"+num2str(i)+".jpg";
+    else 
+        str = "Pictures/Test/apple_"+num2str(i)+".jpg";
+    end 
+    if exist(str, 'file') == 2  %%jei egzistuoja failas tokiu pavadinimu tada nuskaitom
+        pav = imread(str);
+        y_teorine(t0) = 1;
+        x1_spalva(t0) = spalva_color(pav);
+        x2_apvalumas(t0) = apvalumas_roundness(pav);
+        t0 = t0+1;
+    end
+end
+t00 = t0; %%temp naudojamas grafikui 
+
+
+
+for i=0:1:100 %%NUSKAITOMI KRIAUSIU PAVEIKSLELIAI 
+    if i<10
+        str = "Pictures/Test/pear_0"+num2str(i)+".jpg";
+    else 
+        str = "Pictures/Test/pear_"+num2str(i)+".jpg";
+    end 
+    if exist(str, 'file') == 2 %%jei egzistuoja failas tokiu pavadinimu tada nuskaitom
+        pav = imread(str);
+        y_teorine(t0) = -1;
+        x1_spalva(t0) = spalva_color(pav);
+        x2_apvalumas(t0) = apvalumas_roundness(pav);
+        t0 = t0+1;
+    end
+end
+
+pav_kiekis = t0-1;
+    
+
+figure(2);
+x1_spalva_apples = x1_spalva(1:t00-1);
+x2_apvalumas_apples = x2_apvalumas(1:t00-1);
+x1_spalva_pear = x1_spalva(1,t00:pav_kiekis);
+x2_apvalumas_pear = x2_apvalumas(1,t00:pav_kiekis);
+scatter(x1_spalva_apples, x2_apvalumas_apples, 'X', "B");
+% xlim([0 1]); 
+% ylim([0 1]);
+hold on 
+scatter(x1_spalva_pear, x2_apvalumas_pear, 'O', "R");
+hold on 
+plot(x1_grafikui, x2_grafikui)
+legend("Apples", "Pears", "Kreive");
+xlabel("x1 (spalva)");
+ylabel("x2 (apvalumas)")
+title("Testavimo rezultatai")
+
+
+
+er = 0;
+for i = 1:1:pav_kiekis
+        
+        v = w1*x1_spalva(i) + w2*x2_apvalumas(i) + b;
+        if v>0
+            y_praktine(i) = -1; 
+        else 
+            y_praktine(i) = 1;
+        end 
+        if y_praktine(i) ~= y_teorine(i)
+            er = er+1; 
+        end
+
+end
+
+er_prc = 100*(1-er/pav_kiekis)
+
+
+
+
+
+
+
+
+
+
+
